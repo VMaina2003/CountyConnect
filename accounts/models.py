@@ -2,14 +2,17 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from cloudinary.models import CloudinaryField
 
+
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError('The Email field is required')
         email = self.normalize_email(email)
+        extra_fields.setdefault('is_active', False)  
+        extra_fields.setdefault('role', CustomUser.UserRole.VIEWER)
+
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
-        user.role = CustomUser.UserRole.VIEWER
         user.save(using=self._db)
         return user
 
@@ -26,20 +29,20 @@ class CustomUserManager(BaseUserManager):
 
         return self.create_user(email, password, **extra_fields)
 
+
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     class UserRole(models.TextChoices):
         ADMIN = 'ADMIN', 'Admin'
-        County_Official= 'EDITOR', 'Editor'
-        Citizen = 'WRITER', 'Writer'
+        COUNTY_OFFICIAL = 'COUNTY_OFFICIAL', 'County Official'
+        CITIZEN = 'CITIZEN', 'Citizen'
         VIEWER = 'VIEWER', 'Viewer'
-        
-        
+
     email = models.EmailField(unique=True)
     username = models.CharField(max_length=150, unique=True, blank=True, null=True)
     first_name = models.CharField(max_length=30, blank=True)
     last_name = models.CharField(max_length=30, blank=True)
-    role = models.CharField(max_length=10, choices=UserRole.choices, default=UserRole.VIEWER)
-    is_active = models.BooleanField(default=True)
+    role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.VIEWER)
+    is_active = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
 
@@ -49,32 +52,33 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = []
 
     def __str__(self):
-        return self.username if self.username else self.email
+        return self.username or self.email
 
-    # Role check methods
+    # Role checks
     def is_admin(self):
         return self.role == self.UserRole.ADMIN
-    
+
     def is_official(self):
-        return self.role == self.UserRole.County_Official
-    
+        return self.role == self.UserRole.COUNTY_OFFICIAL
+
     def is_citizen(self):
-        return self.role == self.UserRole.Citizen
-    
+        return self.role == self.UserRole.CITIZEN
+
     def is_viewer(self):
         return self.role == self.UserRole.VIEWER
-    
+
     def get_display_name(self):
         if self.first_name or self.last_name:
             return f"{self.first_name} {self.last_name}".strip()
-        return self.username if self.username else self.email
+        return self.username or self.email
+
 
 class Profile(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='profile')
     bio = models.TextField(blank=True)
     phone = models.CharField(max_length=15, blank=True)
-    location = models.CharField(max_length=30, blank=True)
+    location = models.CharField(max_length=100, blank=True)
     avatar = CloudinaryField('image', blank=True, null=True)
-    
+
     def __str__(self):
-        return f"{self.user.username}'s profile" if self.user.username else f"{self.user.email}'s profile"  
+        return f"{self.user.get_display_name()}'s profile"
