@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     'dashboard',
     'reports',
     'notifications',
+    'locations',
+    'departments',
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',  # optional but useful for frontend integration
